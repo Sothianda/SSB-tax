@@ -32,7 +32,7 @@ tapply(u$garde, u$store_type, mean)
 tapply(u$garde, u$taxed, mean)
 ```
 
-#### b) Calcule
+#### b)
 
 ```{r}
 # panelB = celui de la question précédente
