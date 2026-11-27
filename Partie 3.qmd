@@ -1,0 +1,147 @@
+---
+title: "Partie 3"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## **3(a) Nombre d'observations par type de magasin et par période**
+
+**Question :** Nombre d'observations par type de magasin et par période (tableau et graphique). Le nombre d'observations est-il similaire entre périodes pour chaque type de magasin ? Pourquoi est-ce un problème pour comparer des prix moyens ?
+
+```{r}
+library(tidyverse)
+
+tab3a <- dat %>%
+  count(store_type, time)
+
+tab3a %>%
+  pivot_wider(
+    names_from = time,
+    values_from = n,
+    values_fill = 0
+  )
+
+ggplot(tab3a, aes(x = store_type, y = n, fill = time)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Nombre d'observations par type de magasin et période",
+    x = "Type de magasin",
+    y = "Nombre d'observations",
+    fill = "Période"
+  ) +
+  theme_minimal()
+```
+
+Le nombre d’observations varie selon les types de magasins et les périodes, ce qui peut biaiser la comparaison des prix moyens avant et après la taxe, car leur évolution peut résulter d’un changement dans la composition de l’échantillon plutôt que d’une réelle variation des prix.
+
+## **3(b) Nombre et part des boissons taxées et non taxées**
+
+**Question :** Nombre de boissons taxées et non taxées par type de magasin et par période, et part de chaque catégorie. L'offre de boissons a-t-elle changé avant/après la taxe ? Justifiez avec vos chiffres.
+
+```{r}
+
+## Tableau
+
+tab3b <- dat %>%
+  count(store_type, time, taxed) %>%
+  group_by(store_type, time) %>%
+  mutate(part = round(n / sum(n) * 100, 2)) %>%
+  ungroup()
+
+tab3b %>%
+  pivot_wider(
+    names_from = taxed,
+    values_from = c(n, part)
+  )
+
+## Graphique 
+
+ggplot(tab3b, aes(x = time, y = part, fill = taxed)) +
+  geom_col() +
+  facet_wrap(~ store_type) +
+  scale_fill_manual(
+    values = c("not taxed" = "steelblue",
+               "taxed" = "orange")
+  ) +
+  labs(
+    title = "Répartition des boissons taxées et non taxées",
+    x = "Période",
+    y = "Part des observations (%)",
+    fill = "Statut fiscal"
+  ) +
+  theme_minimal()
+```
+
+La composition de l’offre observée évolue différemment selon les magasins : la part des boissons taxées diminue dans les grands supermarchés (de 47,16 % à 43,75 %), augmente dans les stations-service (de 54,05 % à 58,44 %) et reste relativement stable dans les petits supermarchés et les pharmacies, sans que ces évolutions puissent être directement attribuées à la taxe.
+
+## **3(c) Nombre de produits par période**
+
+**Question :** Nombre de produits par période. Quels types de produits ont le plus et le moins d'observations ? Pourquoi certains produits ont-ils plus d'observations que d'autres ? Proposez deux explications (une liée à la conception de l'enquête, une liée au comportement des magasins).
+
+**1. Quel est le nombre de produits par période ?**
+
+```{r}
+
+## Tableau
+
+tab3c <- dat %>%
+  group_by(time) %>%
+  summarise(
+    nb_produits = n_distinct(product_id),
+    .groups = "drop"
+  )
+
+tab3c
+
+## Graphique
+
+ggplot(tab3c, aes(x = time, y = nb_produits)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = nb_produits), vjust = -0.5) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  labs(
+    title = "Nombre de produits distincts par période",
+    x = "Période",
+    y = "Nombre de produits distincts"
+  ) +
+  theme_minimal()
+```
+
+Le nombre de produits distincts diminue au cours des trois périodes étudiées. Il passe de 197 en décembre 2014 à 192 en juin 2015, puis à 139 en mars 2016. Cela représente une diminution de 58 produits, soit une baisse de 29,4 % entre la première et la dernière période. La diversité des produits observés dans l'échantillon diminue donc au cours du temps.
+
+**2. Quels types de produits ont le plus et le moins d'observations ?**
+
+```{r}
+
+tab_types <- dat %>%
+  count(type, sort = TRUE)
+
+tab_types
+
+ggplot(tab_types, aes(x = reorder(type, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Nombre d'observations par type de produit",
+    x = "Type de produit",
+    y = "Nombre d'observations"
+  ) +
+  theme_minimal()
+
+```
+
+Les types de produits les plus observés sont les sodas classiques (SODA), avec 721 observations, et les sodas light (SODA DIET), avec 431 observations. Ces deux catégories représentent à elles seules 52,6 % de l'ensemble des observations.
+
+À l'inverse, les eaux sucrées (WATER SWEET) et les boissons pour sportifs light (SPORT DIET) sont les catégories les moins représentées, avec respectivement 3 et 4 observations.
+
+**3. Pourquoi certains produits ont-ils plus d'observations que d'autres ? Proposez deux explications.**
+
+**Une explication liée à la conception de l'enquête :** les chercheurs ont sélectionné un ensemble de produits appartenant à un panel standard et à un panel supplémentaire. Certaines catégories, notamment les sodas, peuvent avoir été davantage sélectionnées en raison de leur importance dans l'étude de la taxe sur les boissons sucrées. Le nombre d'observations dépend donc des choix effectués lors de la conception de l'enquête.
+
+**Une explication liée au comportement des magasins :** les magasins peuvent proposer davantage de références de boissons populaires, comme les sodas, afin de répondre à la demande des consommateurs. À l'inverse, les boissons plus spécifiques peuvent être disponibles dans un nombre limité de magasins. Les ruptures de stock et les décisions d'assortiment peuvent également expliquer ces différences.
