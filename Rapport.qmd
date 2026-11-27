@@ -5,10 +5,10 @@ editor: visual
 ---
 
 ```{r}
-#| message: false
 library(readxl)
 library(writexl)
 library(tidyverse)
+library(gt)
 ```
 
 ## Partie 1
@@ -44,7 +44,7 @@ dat[dat$size < 1, ]
 
 On constate que les dimensions avant le nettoyage sont :
 
-```
+```         
 2190   12
 ```
 
@@ -358,4 +358,12 @@ coef(summary(modele))[c("taxe_jun", "taxe_mar"), ]
 
 ## Partie 5
 
-À compléter.
+```{r}
+part_5_1 <- dat %>%
+  filter(time %in% c("DEC2014", "JUN2015"))
+
+diffs <- part_5_1 %>%
+  select(store_id, price_per_oz_c, time, taxed) %>%
+  pivot_wider(names_from = time, values_from = price_per_oz_c) %>%
+  mutate(diff = JUN2015 - DEC2014)
+```
