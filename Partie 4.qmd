@@ -12,11 +12,11 @@ editor: visual
 std <- dat[dat$supp == "Standard", ]
 std$cle <- paste(std$store_id, std$product_id)
 
-# (A) produit présent aux 3 périodes dans l'échantillon
+# (a) Produit présent aux 3 périodes dans l'échantillon
 nA <- tapply(std$time, std$product_id, function(x) length(unique(x)))
 panelA <- std[std$product_id %in% names(nA)[!is.na(nA) & nA == 3], ]
 
-# (B) couple magasin × produit présent aux 3 périodes
+# (b) Couple magasin × produit présent aux 3 périodes
 nB <- tapply(std$time, std$cle, function(x) length(unique(x)))
 panelB <- std[std$cle %in% names(nB)[nB == 3], ]
 
@@ -32,11 +32,89 @@ tapply(u$garde, u$store_type, mean)
 tapply(u$garde, u$taxed, mean)
 ```
 
-You can add options to executable code like this
+#### b) Calcule
 
 ```{r}
-#| echo: false
-2 * 2
+# panelB = celui de la question précédente
+moy <- aggregate(price_per_oz_c ~ taxed + store_type + time, data = panelB, FUN = mean)
+moy
+
+# vue d'ensemble, tous types de magasins confondus
+round(tapply(panelB$price_per_oz_c, list(panelB$taxed, panelB$time), mean), 2)
+
+library(ggplot2)
+ggplot(moy, aes(x = time, y = price_per_oz_c, colour = taxed, group = taxed)) +
+  geom_line() + geom_point() +
+  facet_wrap(~ store_type, nrow = 1) +
+  labs(x = "Période", y = "Prix moyen par once (centimes)", colour = NULL) +
+  theme_minimal() + theme(legend.position = "bottom")
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+#### c) Commentez les différences et tendances générales entre décembre 2014, juin 2015 et mars 2016
+
+```{r}
+# ---- Panel équilibré B (couple magasin x produit aux 3 périodes) ----
+std <- dat[dat$supp == "Standard", ]
+std$cle <- paste(std$store_id, std$product_id)
+nB <- tapply(std$time, std$cle, function(x) length(unique(x)))
+panelB <- std[std$cle %in% names(nB)[nB == 3], ]
+```
+
+```{r}
+# (c) Différences et tendances entre DEC2014, JUN2015, MAR2016
+# Prix moyen par once (centimes) : statut fiscal x période
+moy_tot <- tapply(panelB$price_per_oz_c, list(panelB$taxed, panelB$time), mean)
+round(moy_tot, 2)
+
+# Écart taxé - non taxé à chaque période
+round(moy_tot["taxed", ] - moy_tot["not taxed", ], 2)
+
+# Variations d'une période à l'autre
+round(moy_tot[, "JUN2015"] - moy_tot[, "DEC2014"], 2)   # DEC14 -> JUN15
+round(moy_tot[, "MAR2016"] - moy_tot[, "JUN2015"], 2)   # JUN15 -> MAR16
+
+# Même chose par type de magasin
+moy <- aggregate(price_per_oz_c ~ taxed + store_type + time, data = panelB, FUN = mean)
+tab <- reshape(moy, idvar = c("taxed", "store_type"), timevar = "time", direction = "wide")
+names(tab) <- sub("price_per_oz_c.", "", names(tab))
+tab$var_dec_jun <- tab$JUN2015 - tab$DEC2014
+tab$var_jun_mar <- tab$MAR2016 - tab$JUN2015
+tab <- tab[order(tab$store_type, tab$taxed), ]
+tab[, -(1:2)] <- round(tab[, -(1:2)], 2)
+tab
+```
+
+#### d)
+
+```{r}
+# 1. Avant la taxe (DEC2014), les groupes diffèrent déjà
+dec <- panelB[panelB$time == "DEC2014", ]
+
+round(tapply(dec$price_per_oz_c, dec$taxed, mean), 2)    # écart de moyenne avant la taxe
+round(tapply(dec$price_per_oz_c, dec$taxed, median), 2)  # médianes : quasi identiques
+t.test(price_per_oz_c ~ taxed, data = dec)               # écart testé
+
+# 2. Pourquoi ? Les groupes ne contiennent pas les mêmes produits
+table(droplevels(dec$type), dec$taxed)                   # types de boissons
+round(tapply(dec$size, dec$taxed, mean), 1)              # taille moyenne (oz)
+round(prop.table(table(dec$store_type, dec$taxed), 2), 2) # répartition par magasin
+
+# Prix moyen par type de boisson : les énergisantes tirent la moyenne taxée vers le haut
+round(sort(tapply(dec$price_per_oz_c, droplevels(dec$type), mean)), 1)
+
+# 3. Comparer les évolutions plutôt que les niveaux (double différence)
+did_jun <- (moy_tot["taxed", "JUN2015"] - moy_tot["taxed", "DEC2014"]) -
+  (moy_tot["not taxed", "JUN2015"] - moy_tot["not taxed", "DEC2014"])
+did_mar <- (moy_tot["taxed", "MAR2016"] - moy_tot["taxed", "DEC2014"]) -
+  (moy_tot["not taxed", "MAR2016"] - moy_tot["not taxed", "DEC2014"])
+round(c(DEC14_JUN15 = did_jun, DEC14_MAR16 = did_mar), 2)
+
+# Même double différence par régression, avec DEC2014 comme référence.
+# factor(cle) = effets fixes magasin x produit : chaque couple est comparé à lui-même.
+# Les coefficients taxe_jun et taxe_mar sont les doubles différences.
+panelB$taxe_jun <- as.numeric(panelB$taxed == "taxed" & panelB$time == "JUN2015")
+panelB$taxe_mar <- as.numeric(panelB$taxed == "taxed" & panelB$time == "MAR2016")
+modele <- lm(price_per_oz_c ~ time + taxe_jun + taxe_mar + factor(cle), data = panelB)
+coef(summary(modele))[c("taxe_jun", "taxe_mar"), ]
+# Attention : écarts-types non groupés par magasin -> sans doute trop optimistes.
+```
