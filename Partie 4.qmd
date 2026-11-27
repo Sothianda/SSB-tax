@@ -1,0 +1,42 @@
+---
+title: "Partie 4"
+format: html
+editor: visual
+---
+
+## Partie 4
+
+#### a) 
+
+```{r}
+std <- dat[dat$supp == "Standard", ]
+std$cle <- paste(std$store_id, std$product_id)
+
+# (A) produit présent aux 3 périodes dans l'échantillon
+nA <- tapply(std$time, std$product_id, function(x) length(unique(x)))
+panelA <- std[std$product_id %in% names(nA)[!is.na(nA) & nA == 3], ]
+
+# (B) couple magasin × produit présent aux 3 périodes
+nB <- tapply(std$time, std$cle, function(x) length(unique(x)))
+panelB <- std[std$cle %in% names(nB)[nB == 3], ]
+
+# effectifs par type de magasin
+compte <- function(d) sapply(split(d, d$store_type), function(x)
+  c(lignes = nrow(x), couples = length(unique(x$cle)), magasins = length(unique(x$store_id))))
+compte(std); compte(panelA); compte(panelB)
+
+# qui est éliminé par B ?
+u <- unique(std[, c("cle", "taxed", "store_type")])
+u$garde <- u$cle %in% panelB$cle
+tapply(u$garde, u$store_type, mean)
+tapply(u$garde, u$taxed, mean)
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
