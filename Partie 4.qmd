@@ -94,14 +94,21 @@ round(tapply(dec$price_per_oz_c, dec$taxed, mean), 2)    # écart de moyenne ava
 round(tapply(dec$price_per_oz_c, dec$taxed, median), 2)  # médianes : quasi identiques
 t.test(price_per_oz_c ~ taxed, data = dec)               # écart testé
 
+
+# Prix moyen par type de boisson : les énergisantes tirent la moyenne taxée vers le haut
+round(sort(tapply(dec$price_per_oz_c, droplevels(dec$type), mean)), 1)
+
+```
+
+```{r}
 # 2. Pourquoi ? Les groupes ne contiennent pas les mêmes produits
 table(droplevels(dec$type), dec$taxed)                   # types de boissons
 round(tapply(dec$size, dec$taxed, mean), 1)              # taille moyenne (oz)
 round(prop.table(table(dec$store_type, dec$taxed), 2), 2) # répartition par magasin
 
-# Prix moyen par type de boisson : les énergisantes tirent la moyenne taxée vers le haut
-round(sort(tapply(dec$price_per_oz_c, droplevels(dec$type), mean)), 1)
+```
 
+```{r}
 # 3. Comparer les évolutions plutôt que les niveaux (double différence)
 did_jun <- (moy_tot["taxed", "JUN2015"] - moy_tot["taxed", "DEC2014"]) -
   (moy_tot["not taxed", "JUN2015"] - moy_tot["not taxed", "DEC2014"])
@@ -112,9 +119,9 @@ round(c(DEC14_JUN15 = did_jun, DEC14_MAR16 = did_mar), 2)
 # Même double différence par régression, avec DEC2014 comme référence.
 # factor(cle) = effets fixes magasin x produit : chaque couple est comparé à lui-même.
 # Les coefficients taxe_jun et taxe_mar sont les doubles différences.
+
 panelB$taxe_jun <- as.numeric(panelB$taxed == "taxed" & panelB$time == "JUN2015")
 panelB$taxe_mar <- as.numeric(panelB$taxed == "taxed" & panelB$time == "MAR2016")
 modele <- lm(price_per_oz_c ~ time + taxe_jun + taxe_mar + factor(cle), data = panelB)
 coef(summary(modele))[c("taxe_jun", "taxe_mar"), ]
-# Attention : écarts-types non groupés par magasin -> sans doute trop optimistes.
 ```
