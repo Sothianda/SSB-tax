@@ -1,0 +1,38 @@
+---
+title: "0"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+library(readxl)
+dat <- read_excel("sps_public_data_etudiants.xlsx")
+View(dat)
+dat$type <- factor(dat$type)
+dat$taxed <- factor(dat$taxed, labels = c("not taxed", "taxed"))
+dat$supp <- factor(dat$supp, labels = c("Standard", "Supplemental"))
+dat$store_id <- factor(dat$store_id)
+dat$store_type <- factor(dat$store_type,
+                         labels = c("Large Supermarket", "Small Supermarket", "Pharmacy", "Gas Station"))
+dat$type2 <- factor(dat$type2)
+dat$product_id <- factor(dat$product_id)
+dat$time <- factor(dat$time)
+  
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
