@@ -11,6 +11,22 @@ library(tidyverse)
 library(gt)
 ```
 
+## Partie 0
+
+```{r}
+dat <- read_excel("sps_public_data_etudiants.xlsx")
+View(dat)
+dat$type <- factor(dat$type)
+dat$taxed <- factor(dat$taxed, labels = c("not taxed", "taxed"))
+dat$supp <- factor(dat$supp, labels = c("Standard", "Supplemental"))
+dat$store_id <- factor(dat$store_id)
+dat$store_type <- factor(dat$store_type,
+                         labels = c("Large Supermarket", "Small Supermarket", "Pharmacy", "Gas Station"))
+dat$type2 <- factor(dat$type2)
+dat$product_id <- factor(dat$product_id)
+dat$time <- factor(dat$time)
+```
+
 ## Partie 1
 
 On fait d'abord l'analyse exploratoire des données.
