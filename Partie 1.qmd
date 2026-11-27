@@ -35,26 +35,64 @@ tab_croise
 On constate que les dimensions avant le nettoyage est :
 
 ```         
-2174   12
+2190   12
 ```
 
 b\) On enlève les 16 doublons de la base des données.
 
 ```{r}
+library(readxl)
+library(writexl)
+
+dat <- read_excel("sps_public_data_etudiants.xlsx")
+dat <- as.data.frame(dat)
+
+dim(dat)                 
+str(dat)
+summary(dat)
+colSums(is.na(dat))
+sum(duplicated(dat))     
+#  On a 16 doublons
+table(dat$store_id, dat$store_type)   
+# magasins 1, 21, 22 : deux types
+table(dat$type2, useNA = "ifany")     
+dat[dat$size < 1, ]                   
+# On a une taille aberrante (0.19 oz)
+
+# Nettoyage
+# 1. Pour les doublons
 dat <- dat[!duplicated(dat), ]
-dat
-```
 
-```{r}
-dim(dat)
-```
+# 2. Prix par once : 10 NA + 6 valeurs en cents donc on recalcule
+dat$price_per_oz <- dat$price / dat$size
 
-La nouvelle dimension est :
+# 3. Taille aberrante on les transforme en  NA
+aberrant <- dat$size < 1
+dat$size[aberrant] <- NA
+dat$price_per_oz[aberrant] <- NA
+dat$price_per_oz_c[aberrant] <- NA
 
-```         
-2174   12
-```
+# 4. Type de magasin : type majoritaire de chaque magasin
+type_majoritaire <- tapply(dat$store_type, dat$store_id,
+                           function(x) as.numeric(names(which.max(table(x)))))
+dat$store_type <- as.numeric(type_majoritaire[as.character(dat$store_id)])
 
-```{r}
+# 5. Les UNKNOWN on les trasnforme en NA
+dat$type2[dat$type2 == "UNKNOWN"] <- NA
 
+# 6. Facteurs 
+dat$store_type <- factor(dat$store_type, levels = c(1, 2, 3, 4),
+                         labels = c("Large Supermarket", "Small Supermarket",
+                                    "Pharmacy", "Gas Station"))
+dat$supp  <- factor(dat$supp,  levels = c(0, 1), labels = c("Standard", "Supplemental"))
+dat$taxed <- factor(dat$taxed, levels = c(0, 1), labels = c("not taxed", "taxed"))
+dat$type  <- factor(dat$type)
+dat$type2 <- factor(dat$type2)
+dat$store_id   <- factor(dat$store_id)
+dat$product_id <- factor(dat$product_id)
+dat$time <- factor(dat$time, levels = c("DEC2014", "JUN2015", "MAR2016"))
+
+# Création du nouveau fichier
+saveRDS(dat, "dat.rds")      
+write_xlsx(dat, "dat.xlsx")  
 ```
