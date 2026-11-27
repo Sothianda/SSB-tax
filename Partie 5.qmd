@@ -5,14 +5,19 @@ editor: visual
 ---
 
 ```{r}
-1 + 1
+library(tidyverse)
+library(gt)
 ```
-
-You can add options to executable code like this
 
 ```{r}
-#| echo: false
-2 * 2
-```
+part_5_1 <- dat %>%
+  filter(time %in% c("DEC2014", "JUN2015"))
 
-The `echo: false` option disables the printing of code (only output is displayed).
+diffs <- part_5_1 %>%
+  select(store_id, price_per_oz_c, time, taxed) %>%
+  pivot_wider(names_from = time, values_from = price_per_oz_c) %>%
+  mutate(diff = JUN2015 - DEC2014)
+
+
+
+```
