@@ -1,0 +1,60 @@
+---
+title: "4"
+format: html
+editor: visual
+---
+
+## Quarto
+
+## Partie 1
+
+On fait d'abord l'analyse exploratoire des données.
+
+On analyse le type des variables, valeurs manquantes, dimension, valeurs extrêmes, etc.
+
+```{r}
+dim(dat)
+nrow(dat)
+ncol(dat)
+
+str(dat)
+summary(dat)
+
+
+sum(is.na(dat))
+colSums(is.na(dat))
+
+sum(duplicated(dat)) # il y a 16 doublons
+
+# Tableau croisé entre magasin et type
+
+tab_croise <- table(dat$store_type, dat$type)
+tab_croise
+```
+
+On constate que les dimensions avant le nettoyage est :
+
+```         
+2174   12
+```
+
+b\) On enlève les 16 doublons de la base des données.
+
+```{r}
+dat <- dat[!duplicated(dat), ]
+dat
+```
+
+```{r}
+dim(dat)
+```
+
+La nouvelle dimension est :
+
+```         
+2174   12
+```
+
+```{r}
+
+```
