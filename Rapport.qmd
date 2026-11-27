@@ -284,7 +284,7 @@ compte <- function(d) sapply(split(d, d$store_type), function(x)
   c(lignes = nrow(x), couples = length(unique(x$cle)), magasins = length(unique(x$store_id))))
 compte(std); compte(panelA); compte(panelB)
 
-# qui est éliminé par B ?
+# qui est éliminé par B
 u <- unique(std[, c("cle", "taxed", "store_type")])
 u$garde <- u$cle %in% panelB$cle
 tapply(u$garde, u$store_type, mean)
