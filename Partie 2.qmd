@@ -30,5 +30,5 @@ table(magasins$store_type)
 
 ## Ecart avec lee nombre de produits de la database et les 70 produits :
 tapply(dat$product_id, dat$supp, function(x) length(unique(x)))
-## Cela vient de la variable standard, ils ne sont pas comptabilisés car seulement 70 produits ont été retenue en standard
+## Cela vient de la variable standard, ils ne sont pas comptabilisés car seulement 70 produits ont été retenue en panel standard
 ```
