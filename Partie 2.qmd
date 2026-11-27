@@ -4,23 +4,31 @@ format: html
 editor: visual
 ---
 
-## Quarto
+## Partie 2
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+#### a)
 
 ```{r}
-  
+## Nombre de magasins uniques 
+length(unique(dat$store_id))
+## 26 Magasins uniques
+
+## Produits différents
+length(unique(dat$product_id))
+## 247 Produits différents
+
+
 ```
 
-You can add options to executable code like this
+#### b)
 
 ```{r}
-#| echo: false
-2 * 2
-```
+## Magasins par type
+magasins <- unique(dat[, c("store_id", "store_type")])
+table(magasins$store_type)
+## On a 6 Grands Supermarché, 15 Petits supermarchés, 4 Pharmacies et 3 Station à essence.
 
-The `echo: false` option disables the printing of code (only output is displayed).
+## Ecart avec lee nombre de produits de la database et les 70 produits :
+tapply(dat$product_id, dat$supp, function(x) length(unique(x)))
+## Cela vient de la variable standard, ils ne sont pas comptabilisés car seulement 70 produits ont été retenue en standard
+```
