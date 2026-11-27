@@ -1,0 +1,361 @@
+---
+title: "Taxe sur les boissons sucrées : analyse de la base SPS"
+format: html
+editor: visual
+---
+
+```{r}
+#| message: false
+library(readxl)
+library(writexl)
+library(tidyverse)
+```
+
+## Partie 1
+
+On fait d'abord l'analyse exploratoire des données.
+
+On analyse le type des variables, valeurs manquantes, dimension, valeurs extrêmes, etc.
+
+```{r}
+dat <- read_excel("sps_public_data_etudiants.xlsx")
+dat <- as.data.frame(dat)
+
+dim(dat)
+str(dat)
+summary(dat)
+
+sum(is.na(dat))
+colSums(is.na(dat))
+
+sum(duplicated(dat))
+# On a 16 doublons
+
+# Tableau croisé entre magasin et type
+tab_croise <- table(dat$store_type, dat$type)
+tab_croise
+
+table(dat$store_id, dat$store_type)
+# magasins 1, 21, 22 : deux types
+table(dat$type2, useNA = "ifany")
+dat[dat$size < 1, ]
+# On a une taille aberrante (0.19 oz)
+```
+
+On constate que les dimensions avant le nettoyage sont :
+
+```
+2190   12
+```
+
+b\) Nettoyage de la base de données.
+
+```{r}
+# 1. Pour les doublons
+dat <- dat[!duplicated(dat), ]
+
+# 2. Prix par once : 10 NA + 6 valeurs en cents donc on recalcule
+dat$price_per_oz <- dat$price / dat$size
+
+# 3. Taille aberrante on les transforme en NA
+aberrant <- dat$size < 1
+dat$size[aberrant] <- NA
+dat$price_per_oz[aberrant] <- NA
+dat$price_per_oz_c[aberrant] <- NA
+
+# 4. Type de magasin : type majoritaire de chaque magasin
+type_majoritaire <- tapply(dat$store_type, dat$store_id,
+                           function(x) as.numeric(names(which.max(table(x)))))
+dat$store_type <- as.numeric(type_majoritaire[as.character(dat$store_id)])
+
+# 5. Les UNKNOWN on les transforme en NA
+dat$type2[dat$type2 == "UNKNOWN"] <- NA
+
+# 6. Facteurs
+dat$store_type <- factor(dat$store_type, levels = c(1, 2, 3, 4),
+                         labels = c("Large Supermarket", "Small Supermarket",
+                                    "Pharmacy", "Gas Station"))
+dat$supp  <- factor(dat$supp,  levels = c(0, 1), labels = c("Standard", "Supplemental"))
+dat$taxed <- factor(dat$taxed, levels = c(0, 1), labels = c("not taxed", "taxed"))
+dat$type  <- factor(dat$type)
+dat$type2 <- factor(dat$type2)
+dat$store_id   <- factor(dat$store_id)
+dat$product_id <- factor(dat$product_id)
+dat$time <- factor(dat$time, levels = c("DEC2014", "JUN2015", "MAR2016"))
+
+dim(dat)
+
+# Création du nouveau fichier
+saveRDS(dat, "dat.rds")
+write_xlsx(dat, "dat.xlsx")
+```
+
+## Partie 2
+
+#### a)
+
+```{r}
+## Nombre de magasins uniques
+length(unique(dat$store_id))
+## 26 Magasins uniques
+
+## Produits différents
+length(unique(dat$product_id))
+## 247 Produits différents
+```
+
+#### b)
+
+```{r}
+## Magasins par type
+magasins <- unique(dat[, c("store_id", "store_type")])
+table(magasins$store_type)
+## On a 6 Grands Supermarchés, 15 Petits supermarchés, 2 Pharmacies et 3 Stations à essence.
+
+## Ecart avec le nombre de produits de la database et les 70 produits :
+tapply(dat$product_id, dat$supp, function(x) length(unique(x)))
+## Cela vient de la variable standard, ils ne sont pas comptabilisés car seulement 70 produits ont été retenus en panel standard
+```
+
+## Partie 3
+
+### 3(a) Nombre d'observations par type de magasin et par période
+
+**Question :** Nombre d'observations par type de magasin et par période (tableau et graphique). Le nombre d'observations est-il similaire entre périodes pour chaque type de magasin ? Pourquoi est-ce un problème pour comparer des prix moyens ?
+
+```{r}
+tab3a <- dat %>%
+  count(store_type, time)
+
+tab3a %>%
+  pivot_wider(
+    names_from = time,
+    values_from = n,
+    values_fill = 0
+  )
+
+ggplot(tab3a, aes(x = store_type, y = n, fill = time)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Nombre d'observations par type de magasin et période",
+    x = "Type de magasin",
+    y = "Nombre d'observations",
+    fill = "Période"
+  ) +
+  theme_minimal()
+```
+
+Le nombre d’observations varie selon les types de magasins et les périodes, ce qui peut biaiser la comparaison des prix moyens avant et après la taxe, car leur évolution peut résulter d’un changement dans la composition de l’échantillon plutôt que d’une réelle variation des prix.
+
+### 3(b) Nombre et part des boissons taxées et non taxées
+
+**Question :** Nombre de boissons taxées et non taxées par type de magasin et par période, et part de chaque catégorie. L'offre de boissons a-t-elle changé avant/après la taxe ? Justifiez avec vos chiffres.
+
+```{r}
+## Tableau
+tab3b <- dat %>%
+  count(store_type, time, taxed) %>%
+  group_by(store_type, time) %>%
+  mutate(part = round(n / sum(n) * 100, 2)) %>%
+  ungroup()
+
+tab3b %>%
+  pivot_wider(
+    names_from = taxed,
+    values_from = c(n, part)
+  )
+
+## Graphique
+ggplot(tab3b, aes(x = time, y = part, fill = taxed)) +
+  geom_col() +
+  facet_wrap(~ store_type) +
+  scale_fill_manual(
+    values = c("not taxed" = "steelblue",
+               "taxed" = "orange")
+  ) +
+  labs(
+    title = "Répartition des boissons taxées et non taxées",
+    x = "Période",
+    y = "Part des observations (%)",
+    fill = "Statut fiscal"
+  ) +
+  theme_minimal()
+```
+
+La composition de l’offre observée évolue différemment selon les magasins : la part des boissons taxées diminue dans les grands supermarchés (de 48,02 % à 44,30 %), augmente dans les stations-service (de 53,42 % à 58,67 %) et reste relativement stable dans les petits supermarchés et les pharmacies, sans que ces évolutions puissent être directement attribuées à la taxe.
+
+### 3(c) Nombre de produits par période
+
+**Question :** Nombre de produits par période. Quels types de produits ont le plus et le moins d'observations ? Pourquoi certains produits ont-ils plus d'observations que d'autres ? Proposez deux explications (une liée à la conception de l'enquête, une liée au comportement des magasins).
+
+**1. Quel est le nombre de produits par période ?**
+
+```{r}
+## Tableau
+tab3c <- dat %>%
+  group_by(time) %>%
+  summarise(
+    nb_produits = n_distinct(product_id),
+    .groups = "drop"
+  )
+
+tab3c
+
+## Graphique
+ggplot(tab3c, aes(x = time, y = nb_produits)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = nb_produits), vjust = -0.5) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  labs(
+    title = "Nombre de produits distincts par période",
+    x = "Période",
+    y = "Nombre de produits distincts"
+  ) +
+  theme_minimal()
+```
+
+Le nombre de produits distincts diminue au cours des trois périodes étudiées. Il passe de 197 en décembre 2014 à 192 en juin 2015, puis à 139 en mars 2016. Cela représente une diminution de 58 produits, soit une baisse de 29,4 % entre la première et la dernière période. La diversité des produits observés dans l'échantillon diminue donc au cours du temps.
+
+**2. Quels types de produits ont le plus et le moins d'observations ?**
+
+```{r}
+tab_types <- dat %>%
+  count(type, sort = TRUE)
+
+tab_types
+
+ggplot(tab_types, aes(x = reorder(type, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Nombre d'observations par type de produit",
+    x = "Type de produit",
+    y = "Nombre d'observations"
+  ) +
+  theme_minimal()
+```
+
+Les types de produits les plus observés sont les sodas classiques (SODA), avec 716 observations, et les sodas light (SODA DIET), avec 429 observations. Ces deux catégories représentent à elles seules 52,7 % de l'ensemble des observations.
+
+À l'inverse, les eaux sucrées (WATER SWEET) et les boissons pour sportifs light (SPORT DIET) sont les catégories les moins représentées, avec respectivement 3 et 4 observations.
+
+**3. Pourquoi certains produits ont-ils plus d'observations que d'autres ? Proposez deux explications.**
+
+**Une explication liée à la conception de l'enquête :** les chercheurs ont sélectionné un ensemble de produits appartenant à un panel standard et à un panel supplémentaire. Certaines catégories, notamment les sodas, peuvent avoir été davantage sélectionnées en raison de leur importance dans l'étude de la taxe sur les boissons sucrées. Le nombre d'observations dépend donc des choix effectués lors de la conception de l'enquête.
+
+**Une explication liée au comportement des magasins :** les magasins peuvent proposer davantage de références de boissons populaires, comme les sodas, afin de répondre à la demande des consommateurs. À l'inverse, les boissons plus spécifiques peuvent être disponibles dans un nombre limité de magasins. Les ruptures de stock et les décisions d'assortiment peuvent également expliquer ces différences.
+
+## Partie 4
+
+#### a)
+
+```{r}
+std <- dat[dat$supp == "Standard", ]
+std$cle <- paste(std$store_id, std$product_id)
+
+# (a) Produit présent aux 3 périodes dans l'échantillon
+nA <- tapply(std$time, std$product_id, function(x) length(unique(x)))
+panelA <- std[std$product_id %in% names(nA)[!is.na(nA) & nA == 3], ]
+
+# (b) Couple magasin × produit présent aux 3 périodes
+nB <- tapply(std$time, std$cle, function(x) length(unique(x)))
+panelB <- std[std$cle %in% names(nB)[nB == 3], ]
+
+# effectifs par type de magasin
+compte <- function(d) sapply(split(d, d$store_type), function(x)
+  c(lignes = nrow(x), couples = length(unique(x$cle)), magasins = length(unique(x$store_id))))
+compte(std); compte(panelA); compte(panelB)
+
+# qui est éliminé par B ?
+u <- unique(std[, c("cle", "taxed", "store_type")])
+u$garde <- u$cle %in% panelB$cle
+tapply(u$garde, u$store_type, mean)
+tapply(u$garde, u$taxed, mean)
+```
+
+#### b)
+
+```{r}
+# panelB = celui de la question précédente
+moy <- aggregate(price_per_oz_c ~ taxed + store_type + time, data = panelB, FUN = mean)
+moy
+
+# vue d'ensemble, tous types de magasins confondus
+round(tapply(panelB$price_per_oz_c, list(panelB$taxed, panelB$time), mean), 2)
+
+ggplot(moy, aes(x = time, y = price_per_oz_c, colour = taxed, group = taxed)) +
+  geom_line() + geom_point() +
+  facet_wrap(~ store_type, nrow = 1) +
+  labs(x = "Période", y = "Prix moyen par once (centimes)", colour = NULL) +
+  theme_minimal() + theme(legend.position = "bottom")
+```
+
+#### c) Commentez les différences et tendances générales entre décembre 2014, juin 2015 et mars 2016
+
+```{r}
+# (c) Différences et tendances entre DEC2014, JUN2015, MAR2016
+# Prix moyen par once (centimes) : statut fiscal x période
+moy_tot <- tapply(panelB$price_per_oz_c, list(panelB$taxed, panelB$time), mean)
+round(moy_tot, 2)
+
+# Écart taxé - non taxé à chaque période
+round(moy_tot["taxed", ] - moy_tot["not taxed", ], 2)
+
+# Variations d'une période à l'autre
+round(moy_tot[, "JUN2015"] - moy_tot[, "DEC2014"], 2)   # DEC14 -> JUN15
+round(moy_tot[, "MAR2016"] - moy_tot[, "JUN2015"], 2)   # JUN15 -> MAR16
+
+# Même chose par type de magasin
+moy <- aggregate(price_per_oz_c ~ taxed + store_type + time, data = panelB, FUN = mean)
+tab <- reshape(moy, idvar = c("taxed", "store_type"), timevar = "time", direction = "wide")
+names(tab) <- sub("price_per_oz_c.", "", names(tab))
+tab$var_dec_jun <- tab$JUN2015 - tab$DEC2014
+tab$var_jun_mar <- tab$MAR2016 - tab$JUN2015
+tab <- tab[order(tab$store_type, tab$taxed), ]
+tab[, -(1:2)] <- round(tab[, -(1:2)], 2)
+tab
+```
+
+#### d)
+
+```{r}
+# 1. Avant la taxe (DEC2014), les groupes diffèrent déjà
+dec <- panelB[panelB$time == "DEC2014", ]
+
+round(tapply(dec$price_per_oz_c, dec$taxed, mean), 2)    # écart de moyenne avant la taxe
+round(tapply(dec$price_per_oz_c, dec$taxed, median), 2)  # médianes : quasi identiques
+t.test(price_per_oz_c ~ taxed, data = dec)               # écart testé
+
+# Prix moyen par type de boisson : les énergisantes tirent la moyenne taxée vers le haut
+round(sort(tapply(dec$price_per_oz_c, droplevels(dec$type), mean)), 1)
+```
+
+```{r}
+# 2. Pourquoi ? Les groupes ne contiennent pas les mêmes produits
+table(droplevels(dec$type), dec$taxed)                   # types de boissons
+round(tapply(dec$size, dec$taxed, mean), 1)              # taille moyenne (oz)
+round(prop.table(table(dec$store_type, dec$taxed), 2), 2) # répartition par magasin
+```
+
+```{r}
+# 3. Comparer les évolutions plutôt que les niveaux (double différence)
+did_jun <- (moy_tot["taxed", "JUN2015"] - moy_tot["taxed", "DEC2014"]) -
+  (moy_tot["not taxed", "JUN2015"] - moy_tot["not taxed", "DEC2014"])
+did_mar <- (moy_tot["taxed", "MAR2016"] - moy_tot["taxed", "DEC2014"]) -
+  (moy_tot["not taxed", "MAR2016"] - moy_tot["not taxed", "DEC2014"])
+round(c(DEC14_JUN15 = did_jun, DEC14_MAR16 = did_mar), 2)
+
+# Même double différence par régression, avec DEC2014 comme référence.
+# factor(cle) = effets fixes magasin x produit : chaque couple est comparé à lui-même.
+# Les coefficients taxe_jun et taxe_mar sont les doubles différences.
+panelB$taxe_jun <- as.numeric(panelB$taxed == "taxed" & panelB$time == "JUN2015")
+panelB$taxe_mar <- as.numeric(panelB$taxed == "taxed" & panelB$time == "MAR2016")
+modele <- lm(price_per_oz_c ~ time + taxe_jun + taxe_mar + factor(cle), data = panelB)
+coef(summary(modele))[c("taxe_jun", "taxe_mar"), ]
+```
+
+## Partie 5
+
+À compléter.
